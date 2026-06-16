@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.database import engine, Base, check_db_connection
+from app.api import users
 
 
 @asynccontextmanager
@@ -38,3 +39,5 @@ def health():
 async def db_check():
     result = await check_db_connection()
     return result
+
+app.include_router(users.router)
