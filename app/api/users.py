@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas import UserCreate, UserUpdate, UserResponse
 from app.services import users as users_service
+from app.tasks.arq_pool import get_arq_pool
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -50,3 +51,25 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
     return None
+
+
+@router.post("/{user_id}/notify")
+async def notify_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    user = await users_service.get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    pool = await get_arq_pool()
+    job = await pool.enqueue_job(
+        "send_email",
+        user_id=user.id,
+        email=user.email,
+        subject="Welcome to InfraStack!",
+    )
+
+    return {
+        "task_id": job.job_id,
+        "status": "queued",
+        "user_id": user.id,
+        "email": user.email,
+    }

@@ -38,14 +38,24 @@ Stack complète conteneurisée avec orchestration Docker Compose.
   - `PUT /users/{id}` — Modifier un utilisateur
   - `DELETE /users/{id}` — Supprimer un utilisateur
 
+## ✅ Étape 5 — Redis + Tâche asynchrone (ARQ)
+
+- [x] Service Redis 7-Alpine dans `docker-compose.yml` avec healthcheck
+- [x] Volume persistant `redis_data`
+- [x] `app/tasks/email.py` — tâche simulée d'envoi d'email (3s)
+- [x] `app/tasks/worker.py` — worker ARQ
+- [x] `app/tasks/arq_pool.py` — pool de connexion Redis
+- [x] Endpoint `POST /users/{id}/notify` — enfile la tâche dans Redis
+- [x] Tâche exécutée par le worker en 3 secondes ✅
+
 ---
 
 ## 🚀 Lancer l'application
 
-### 1. Démarrer PostgreSQL
+### 1. Démarrer PostgreSQL + Redis
 
 ```powershell
-docker compose up -d postgres
+docker compose up -d postgres redis
 ```
 
 ### 2. Activer l'environnement virtuel
@@ -60,7 +70,13 @@ docker compose up -d postgres
 uvicorn app.main:app --reload
 ```
 
-### 4. Tester
+### 4. Lancer le worker ARQ (terminal séparé)
+
+```powershell
+.venv\Scripts\arq app.tasks.worker.WorkerSettings
+```
+
+### 5. Tester
 
 | Endpoint | URL |
 |----------|-----|
@@ -69,6 +85,7 @@ uvicorn app.main:app --reload
 | Health | http://localhost:8000/health |
 | DB Check | http://localhost:8000/db-check |
 | Users CRUD | http://localhost:8000/users |
+| Notify | `POST http://localhost:8000/users/{id}/notify` |
 
 ---
 
