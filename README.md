@@ -1,4 +1,4 @@
-# 🏗️ InfraStack
+#  InfraStack
 
 Stack complète conteneurisée avec orchestration Docker Compose.
 
