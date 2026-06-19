@@ -1,110 +1,187 @@
-#  InfraStack
+# InfraStack
 
-Stack complète conteneurisée avec orchestration Docker Compose.
+API REST FastAPI avec PostgreSQL, Redis, Nginx, Prometheus et Grafana — conteneurisée avec Docker Compose.
 
-**Stack :** FastAPI • PostgreSQL • Redis • ARQ • Nginx • Prometheus • Grafana
+## 📋 Étapes de développement
 
----
+| Étape | Description | Statut |
+|-------|-------------|--------|
+| 1 | Project structure + arborescence + Git | ✅ |
+| 2 | Modèles SQLAlchemy + Pydantic schemas | ✅ |
+| 3 | CRUD Users complet (create, read, update, delete) | ✅ |
+| 4 | Authentification JWT (inscription, login, protection des routes) | ✅ |
+| 5 | Tâches async avec ARQ + Redis (notification email) | ✅ |
+| 6 | Nginx reverse proxy + TLS auto-signé + headers sécurité + gzip | ✅ |
+| 7 | Prometheus + métriques FastAPI (`/metrics`) | ✅ |
+| 8 | Grafana + dashboard pré-provisionné "InfraStack API" | ✅ |
+| 9 | Backups automatiques PostgreSQL + Redis | ⏳ À venir |
+| 10 | Résilience / RTO (reload Nginx, rollback, failover) | ⏳ À venir |
+| 11 | Alerting (Alertmanager, notifications email/Slack) | ⏳ Optionnel |
 
-## ✅ Étape 1 — Structure FastAPI
-
-- [x] Arborescence du projet
-- [x] `app/main.py` avec endpoints `/` et `/health`
-- [x] Environnement virtuel `.venv`
-- [x] FastAPI + Uvicorn installés
-
-## ✅ Étape 2 — PostgreSQL
-
-- [x] Service PostgreSQL 17 dans `docker-compose.yml`
-- [x] Base `infrastack`, user `postgres`
-- [x] Port `5432` exposé
-- [x] Volume persistant `postgres_data`
-
-## ✅ Étape 3 — Connexion FastAPI ↔ PostgreSQL
-
-- [x] `app/core/database.py` — moteur SQLAlchemy async, session, `check_db_connection()`
-- [x] `app/models/__init__.py` — modèle `User`
-- [x] `app/schemas/__init__.py` — schémas Pydantic (`UserCreate`, `UserUpdate`, `UserResponse`)
-- [x] `.env` avec `DATABASE_URL`
-- [x] Endpoint `/db-check`
-
-## ✅ Étape 4 — API CRUD Users
-
-- [x] `app/services/users.py` — couche métier (create, list, get, update, delete)
-- [x] `app/api/users.py` — routes REST :
-  - `POST /users` — Créer un utilisateur
-  - `GET /users` — Lister les utilisateurs
-  - `GET /users/{id}` — Récupérer un utilisateur
-  - `PUT /users/{id}` — Modifier un utilisateur
-  - `DELETE /users/{id}` — Supprimer un utilisateur
-
-## ✅ Étape 5 — Redis + Tâche asynchrone (ARQ)
-
-- [x] Service Redis 7-Alpine dans `docker-compose.yml` avec healthcheck
-- [x] Volume persistant `redis_data`
-- [x] `app/tasks/email.py` — tâche simulée d'envoi d'email (3s)
-- [x] `app/tasks/worker.py` — worker ARQ
-- [x] `app/tasks/arq_pool.py` — pool de connexion Redis
-- [x] Endpoint `POST /users/{id}/notify` — enfile la tâche dans Redis
-- [x] Tâche exécutée par le worker en 3 secondes ✅
-
-## ✅ Étape 6 — Docker multi-stage
-
-- [x] `.dockerignore` optimisé
-- [x] `Dockerfile` multi-stage (builder + runtime)
-- [x] Base `python:3.13-alpine` — image finale légère
-- [x] Service `api` dans `docker-compose.yml` avec `depends_on: condition: service_healthy`
-- [x] Healthcheck intégré dans le conteneur
-- [x] `restart: unless-stopped`
-
----
-
-## 🚀 Lancer l'application
-
-### 1. Démarrer PostgreSQL + Redis
+## 🚀 Démarrage rapide (après un clone)
 
 ```powershell
-docker compose up -d postgres redis
+# 1. Copier la config
+copy .env.example .env
+
+# 2. Générer les certificats TLS pour Nginx
+mkdir nginx\certs
+docker run --rm -v "%cd%\nginx\certs:/certs" alpine:3.18 sh -c "apk add --no-cache openssl && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/infrastack.key -out /certs/infrastack.crt -subj '/CN=localhost/O=InfraStack/C=FR'"
+
+# 3. Lancer toute la stack
+docker compose up -d
+
+# 4. Attendre 20 secondes que les services démarrent
+Start-Sleep -Seconds 20
+
+# 5. Tester
+curl -sk https://localhost/health
+curl -sk https://localhost/users/
 ```
 
-### 2. Activer l'environnement virtuel
+Premier lancement : le build de l'image FastAPI prend ~2 minutes. Les lancements suivants sont immédiats.
+
+
+## 🏗️ Architecture
+
+| Service | Image | Ports | Rôle |
+|---------|-------|-------|------|
+| FastAPI | Python 3.13 Alpine | 8000 | API REST CRUD + async tasks |
+| PostgreSQL | 17 | 5432 | Base de données SQL |
+| Redis | 7 Alpine | 6379 | Cache + file de tâches ARQ |
+| Nginx | 1.27 Alpine | 80, 443 | Reverse proxy + TLS + gzip + headers sécurité |
+| Prometheus | v2.55.0 | 9090 | Métriques temps réel |
+| Grafana | 11.4.0 | 3000 | Dashboards pré-provisionnés |
+
+## 📁 Structure du projet
+
+```
+infrastack/
+├── app/
+│   ├── api/           # Routes REST users
+│   ├── core/          # Database + lifespan
+│   ├── models/        # SQLAlchemy models
+│   ├── schemas/       # Pydantic schemas
+│   ├── services/      # Business logic
+│   └── tasks/         # ARQ worker + email task
+├── nginx/
+│   ├── nginx.conf     # Reverse proxy TLS
+│   └── certs/         # Certificat self-signed
+├── prometheus/
+│   └── prometheus.yml # Scrape config
+├── grafana/
+│   ├── datasources/   # Datasource Prometheus
+│   └── dashboards/    # Dashboard pré-provisionné
+├── tests/             # Tests unitaires + d'intégration
+├── backup/            # Scripts de sauvegarde
+├── Dockerfile         # Multi-stage (141MB)
+├── docker-compose.yml # 6 services
+└── requirements.txt   # 27 packages
+```
+
+## 🔗 URLs importantes
+
+| Outil | URL | Identifiants |
+|-------|-----|--------------|
+| **API (via Nginx HTTPS)** | https://localhost | - |
+| **Swagger UI / Docs** | https://localhost/docs | - |
+| **Health Check** | https://localhost/health | - |
+| **Prometheus** | http://localhost:9090 | - |
+| **Grafana** | http://localhost:3000 | admin / admin |
+
+## 🔐 Sécurité
+
+- **TLS 1.2 / 1.3** — Certificat auto-signé (CN=localhost)
+- **Headers de sécurité** — HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
+- **Compression gzip** activée sur Nginx
+
+> En production, remplacer le certificat auto-signé par un vrai certificat Let's Encrypt.
+
+## 📊 Monitoring
+
+- **Prometheus** scrape les métriques FastAPI (`/metrics`) toutes les 10 secondes
+- **Grafana** est pré-provisionné avec un dashboard "InfraStack API"
+
+### Requêtes Prometheus utiles
+
+```
+# Taux de requêtes par seconde
+rate(http_requests_total[1m])
+
+# Durée des requêtes (p50, p95, p99)
+histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[1m]))
+```
+
+## 🛠️ Commandes utiles
 
 ```powershell
+# Voir les logs d'un service
+docker compose logs -f [service]
+
+# Voir l'état des conteneurs
+docker ps
+
+# Redémarrer un service
+docker compose restart [service]
+
+# Arrêter la stack
+docker compose down
+
+# Arrêter la stack + supprimer les volumes (ATTENTION: perte de données)
+docker compose down -v
+```
+
+## 🧪 Tests
+
+```powershell
+# Tests unitaires
+pytest tests/unit -v
+
+# Tests d'intégration (nécessitent la stack lancée)
+pytest tests/integration -v
+```
+
+## 📦 Installation manuelle (sans Docker)
+
+```powershell
+# 1. Créer un environnement virtuel
+python -m venv .venv
 .venv\Scripts\activate
-```
 
-### 3. Lancer l'API en local (dev)
+# 2. Installer les dépendances
+pip install -r requirements.txt
 
-```powershell
+# 3. Lancer PostgreSQL + Redis (avec Docker)
+docker compose up -d postgres redis
+
+# 4. Lancer l'API
 uvicorn app.main:app --reload
 ```
 
-### 4. Lancer le worker ARQ (terminal séparé)
+## 🔄 Workflow de développement
 
-```powershell
-.venv\Scripts\arq app.tasks.worker.WorkerSettings
-```
+1. Modifier le code dans `app/`
+2. L'API redémarre automatiquement (hot reload)
+3. Tester sur http://localhost:8000/docs
+4. Rebuild l'image Docker pour la production :
+   ```powershell
+   docker compose build api
+   docker compose up -d api
+   ```
 
-### 5. Lancer toute la stack
+## 📝 TODO / Roadmap
 
-```powershell
-docker compose up -d
-```
+- [x] Projet FastAPI + PostgreSQL
+- [x] Auth JWT + CRUD users
+- [x] Tâches async (ARQ + Redis)
+- [x] Nginx reverse proxy + TLS
+- [x] Prometheus + métriques
+- [x] Grafana + dashboard
+- [ ] Backups automatiques (pg_dump, Redis RDB/AOF)
+- [ ] Alerting (Alertmanager, emails, Slack)
+- [ ] Tests unitaires et d'intégration
+- [ ] CI/CD (GitHub Actions)
 
-### 6. Tester
+## 📄 Licence
 
-| Endpoint | URL |
-|----------|-----|
-| API | http://localhost:8000 |
-| Swagger | http://localhost:8000/docs |
-| Health | http://localhost:8000/health |
-| DB Check | http://localhost:8000/db-check |
-| Users CRUD | http://localhost:8000/users |
-| Notify | `POST http://localhost:8000/users/{id}/notify` |
-
----
-
-## 📦 Dépendances
-
-```powershell
-.venv\Scripts\pip install -r requirements.txt
+MIT
