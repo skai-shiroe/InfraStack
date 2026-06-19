@@ -48,6 +48,15 @@ Stack complète conteneurisée avec orchestration Docker Compose.
 - [x] Endpoint `POST /users/{id}/notify` — enfile la tâche dans Redis
 - [x] Tâche exécutée par le worker en 3 secondes ✅
 
+## ✅ Étape 6 — Docker multi-stage
+
+- [x] `.dockerignore` optimisé
+- [x] `Dockerfile` multi-stage (builder + runtime)
+- [x] Base `python:3.13-alpine` — image finale légère
+- [x] Service `api` dans `docker-compose.yml` avec `depends_on: condition: service_healthy`
+- [x] Healthcheck intégré dans le conteneur
+- [x] `restart: unless-stopped`
+
 ---
 
 ## 🚀 Lancer l'application
@@ -64,7 +73,7 @@ docker compose up -d postgres redis
 .venv\Scripts\activate
 ```
 
-### 3. Lancer l'API
+### 3. Lancer l'API en local (dev)
 
 ```powershell
 uvicorn app.main:app --reload
@@ -76,7 +85,13 @@ uvicorn app.main:app --reload
 .venv\Scripts\arq app.tasks.worker.WorkerSettings
 ```
 
-### 5. Tester
+### 5. Lancer toute la stack
+
+```powershell
+docker compose up -d
+```
+
+### 6. Tester
 
 | Endpoint | URL |
 |----------|-----|
