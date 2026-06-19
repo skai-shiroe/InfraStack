@@ -126,6 +126,13 @@ services:
       timeout: 3s
       retries: 3
 
+
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  app-network:
+    driver: bridge
