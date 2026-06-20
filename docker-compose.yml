@@ -111,6 +111,22 @@ services:
       timeout: 3s
       retries: 3
 
+  cron:
+    image: alpine:3.18
+    container_name: infrastack-cron
+    volumes:
+      - ./backup/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./backup:/backups
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache docker-cli dcron &&
+        chmod +x /usr/local/bin/backup.sh &&
+        echo "0 2 * * * /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" > /etc/crontabs/root &&
+        crond -f -l 2
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

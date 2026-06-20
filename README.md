@@ -14,9 +14,9 @@ API REST FastAPI avec PostgreSQL, Redis, Nginx, Prometheus et Grafana — conten
 | 6 | Nginx reverse proxy + TLS auto-signé + headers sécurité + gzip | ✅ |
 | 7 | Prometheus + métriques FastAPI (`/metrics`) | ✅ |
 | 8 | Grafana + dashboard pré-provisionné "InfraStack API" | ✅ |
-| 9 | Backups automatiques PostgreSQL + Redis | ⏳ À venir |
-| 10 | Résilience / RTO (reload Nginx, rollback, failover) | ⏳ À venir |
-| 11 | Alerting (Alertmanager, notifications email/Slack) | ⏳ Optionnel |
+| 9 | Backups automatiques PostgreSQL + Redis | ✅ |
+| 10 | Résilience / RTO (reload Nginx, rollback) | ✅ |
+| 11 | Alerting (Alertmanager, emails, Slack) | ⏳ Optionnel |
 
 ## 🚀 Démarrage rapide (après un clone)
 
@@ -52,6 +52,7 @@ Premier lancement : le build de l'image FastAPI prend ~2 minutes. Les lancements
 | Nginx | 1.27 Alpine | 80, 443 | Reverse proxy + TLS + gzip + headers sécurité |
 | Prometheus | v2.55.0 | 9090 | Métriques temps réel |
 | Grafana | 11.4.0 | 3000 | Dashboards pré-provisionnés |
+| Cron (backup) | Alpine 3.18 | - | Backup automatique PostgreSQL + Redis |
 
 ## 📁 Structure du projet
 
@@ -66,6 +67,7 @@ infrastack/
 │   └── tasks/         # ARQ worker + email task
 ├── nginx/
 │   ├── nginx.conf     # Reverse proxy TLS
+│   ├── nginx-reload.ps1 # Reload sécurisé + rollback
 │   └── certs/         # Certificat self-signed
 ├── prometheus/
 │   └── prometheus.yml # Scrape config
@@ -73,9 +75,12 @@ infrastack/
 │   ├── datasources/   # Datasource Prometheus
 │   └── dashboards/    # Dashboard pré-provisionné
 ├── tests/             # Tests unitaires + d'intégration
-├── backup/            # Scripts de sauvegarde
+├── backup/
+│   ├── backup.ps1     # Script backup Windows (PostgreSQL + Redis)
+│   ├── backup.sh      # Script backup Linux/Docker
+│   └── restore.ps1    # Script de restauration
 ├── Dockerfile         # Multi-stage (141MB)
-├── docker-compose.yml # 6 services
+├── docker-compose.yml # 7 services
 └── requirements.txt   # 27 packages
 ```
 
@@ -94,6 +99,7 @@ infrastack/
 - **TLS 1.2 / 1.3** — Certificat auto-signé (CN=localhost)
 - **Headers de sécurité** — HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
 - **Compression gzip** activée sur Nginx
+- **Reload Nginx sécurisé** — script avec test de config + rollback automatique
 
 > En production, remplacer le certificat auto-signé par un vrai certificat Let's Encrypt.
 
@@ -123,6 +129,15 @@ docker ps
 
 # Redémarrer un service
 docker compose restart [service]
+
+# Backup manuel
+.\backup\backup.ps1
+
+# Restaurer depuis un backup
+.\backup\restore.ps1 -PgDumpFile .\backup\postgresql-20250620-020000.sql -RedisDumpFile .\backup\redis-20250620-020000.rdb
+
+# Recharger Nginx en toute sécurité
+.\nginx\nginx-reload.ps1
 
 # Arrêter la stack
 docker compose down
@@ -177,7 +192,8 @@ uvicorn app.main:app --reload
 - [x] Nginx reverse proxy + TLS
 - [x] Prometheus + métriques
 - [x] Grafana + dashboard
-- [ ] Backups automatiques (pg_dump, Redis RDB/AOF)
+- [x] Backups automatiques (pg_dump, Redis RDB/AOF)
+- [x] Résilience / RTO (reload Nginx, rollback)
 - [ ] Alerting (Alertmanager, emails, Slack)
 - [ ] Tests unitaires et d'intégration
 - [ ] CI/CD (GitHub Actions)
