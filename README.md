@@ -1,8 +1,8 @@
 # InfraStack
 
-API REST FastAPI avec PostgreSQL, Redis, Nginx, Prometheus et Grafana — conteneurisée avec Docker Compose.
+API REST FastAPI avec PostgreSQL, Redis, Nginx, Prometheus, Grafana et Alertmanager — conteneurisée avec Docker Compose.
 
-## 📋 Étapes de développement
+## Étapes de développement
 
 | Étape | Description | Statut |
 |-------|-------------|--------|
@@ -16,9 +16,9 @@ API REST FastAPI avec PostgreSQL, Redis, Nginx, Prometheus et Grafana — conten
 | 8 | Grafana + dashboard pré-provisionné "InfraStack API" | ✅ |
 | 9 | Backups automatiques PostgreSQL + Redis | ✅ |
 | 10 | Résilience / RTO (reload Nginx, rollback) | ✅ |
-| 11 | Alerting (Alertmanager, emails, Slack) | ⏳ Optionnel |
+| 11 | Alerting (Alertmanager + règles d'alerte) | ✅ |
 
-## 🚀 Démarrage rapide (après un clone)
+##  Démarrage rapide (après un clone)
 
 ```powershell
 # 1. Copier la config
@@ -41,8 +41,7 @@ curl -sk https://localhost/users/
 
 Premier lancement : le build de l'image FastAPI prend ~2 minutes. Les lancements suivants sont immédiats.
 
-
-## 🏗️ Architecture
+##  Architecture
 
 | Service | Image | Ports | Rôle |
 |---------|-------|-------|------|
@@ -50,11 +49,12 @@ Premier lancement : le build de l'image FastAPI prend ~2 minutes. Les lancements
 | PostgreSQL | 17 | 5432 | Base de données SQL |
 | Redis | 7 Alpine | 6379 | Cache + file de tâches ARQ |
 | Nginx | 1.27 Alpine | 80, 443 | Reverse proxy + TLS + gzip + headers sécurité |
-| Prometheus | v2.55.0 | 9090 | Métriques temps réel |
+| Prometheus | v2.55.0 | 9090 | Métriques temps réel + alertes |
+| Alertmanager | v0.28.0 | 9093 | Gestion des alertes |
 | Grafana | 11.4.0 | 3000 | Dashboards pré-provisionnés |
 | Cron (backup) | Alpine 3.18 | - | Backup automatique PostgreSQL + Redis |
 
-## 📁 Structure du projet
+##  Structure du projet
 
 ```
 infrastack/
@@ -70,21 +70,24 @@ infrastack/
 │   ├── nginx-reload.ps1 # Reload sécurisé + rollback
 │   └── certs/         # Certificat self-signed
 ├── prometheus/
-│   └── prometheus.yml # Scrape config
+│   ├── prometheus.yml # Scrape config + alerting
+│   └── prometheus.rules.yml # Règles d'alerte
+├── alertmanager/
+│   └── alertmanager.yml # Configuration Alertmanager
 ├── grafana/
 │   ├── datasources/   # Datasource Prometheus
 │   └── dashboards/    # Dashboard pré-provisionné
 ├── tests/             # Tests unitaires + d'intégration
 ├── backup/
-│   ├── backup.ps1     # Script backup Windows (PostgreSQL + Redis)
-│   ├── backup.sh      # Script backup Linux/Docker
+│   ├── backup.ps1     # Script backup Windows
+│   ├── backup.sh      # Script backup Linux + cron Docker
 │   └── restore.ps1    # Script de restauration
 ├── Dockerfile         # Multi-stage (141MB)
-├── docker-compose.yml # 7 services
+├── docker-compose.yml # 8 services
 └── requirements.txt   # 27 packages
 ```
 
-## 🔗 URLs importantes
+##  URLs importantes
 
 | Outil | URL | Identifiants |
 |-------|-----|--------------|
@@ -92,9 +95,10 @@ infrastack/
 | **Swagger UI / Docs** | https://localhost/docs | - |
 | **Health Check** | https://localhost/health | - |
 | **Prometheus** | http://localhost:9090 | - |
+| **Alertmanager** | http://localhost:9093 | - |
 | **Grafana** | http://localhost:3000 | admin / admin |
 
-## 🔐 Sécurité
+##  Sécurité
 
 - **TLS 1.2 / 1.3** — Certificat auto-signé (CN=localhost)
 - **Headers de sécurité** — HSTS, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy
@@ -103,10 +107,19 @@ infrastack/
 
 > En production, remplacer le certificat auto-signé par un vrai certificat Let's Encrypt.
 
-## 📊 Monitoring
+##  Monitoring
 
 - **Prometheus** scrape les métriques FastAPI (`/metrics`) toutes les 10 secondes
 - **Grafana** est pré-provisionné avec un dashboard "InfraStack API"
+- **Alertmanager** gère les alertes (disponible sur http://localhost:9093)
+
+### Règles d'alerte configurées
+
+- API FastAPI down
+- Nginx indisponible
+- PostgreSQL indisponible
+- Redis indisponible
+- Taux d'erreurs 5xx élevé
 
 ### Requêtes Prometheus utiles
 
@@ -118,7 +131,7 @@ rate(http_requests_total[1m])
 histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[1m]))
 ```
 
-## 🛠️ Commandes utiles
+##  Commandes utiles
 
 ```powershell
 # Voir les logs d'un service
@@ -146,7 +159,7 @@ docker compose down
 docker compose down -v
 ```
 
-## 🧪 Tests
+##  Tests
 
 ```powershell
 # Tests unitaires
@@ -156,7 +169,7 @@ pytest tests/unit -v
 pytest tests/integration -v
 ```
 
-## 📦 Installation manuelle (sans Docker)
+##  Installation manuelle (sans Docker)
 
 ```powershell
 # 1. Créer un environnement virtuel
@@ -173,7 +186,7 @@ docker compose up -d postgres redis
 uvicorn app.main:app --reload
 ```
 
-## 🔄 Workflow de développement
+##  Workflow de développement
 
 1. Modifier le code dans `app/`
 2. L'API redémarre automatiquement (hot reload)
@@ -184,7 +197,7 @@ uvicorn app.main:app --reload
    docker compose up -d api
    ```
 
-## 📝 TODO / Roadmap
+##  TODO / Roadmap
 
 - [x] Projet FastAPI + PostgreSQL
 - [x] Auth JWT + CRUD users
@@ -194,10 +207,10 @@ uvicorn app.main:app --reload
 - [x] Grafana + dashboard
 - [x] Backups automatiques (pg_dump, Redis RDB/AOF)
 - [x] Résilience / RTO (reload Nginx, rollback)
-- [ ] Alerting (Alertmanager, emails, Slack)
+- [x] Alerting (Prometheus + Alertmanager)
 - [ ] Tests unitaires et d'intégration
 - [ ] CI/CD (GitHub Actions)
 
-## 📄 Licence
+##  Licence
 
 MIT

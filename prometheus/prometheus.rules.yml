@@ -1,0 +1,29 @@
+groups:
+  - name: infrastack_alerts
+    rules:
+      - alert: InfraStackApiDown
+        expr: up{job="infrastack-api"} == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API FastAPI indisponible"
+          description: "Service {{ $labels.instance }} down."
+
+      - alert: InfraStackNginxDown
+        expr: up{job="nginx"} == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx indisponible"
+          description: "Service {{ $labels.instance }} down."
+
+      - alert: InfraStackHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taux d'erreurs 5xx élevé"
+          description: "Service {{ $labels.instance }} en erreur 5xx."

@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "infrastack-default"
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 1h
+
+receivers:
+  - name: "infrastack-default"
+    webhook_configs:
+      - url: "http://localhost:5001/"
+        send_resolved: true
