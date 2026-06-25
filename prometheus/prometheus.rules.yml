@@ -1,29 +1,74 @@
 groups:
-  - name: infrastack_alerts
+  - name: inventra
+    interval: 10s
     rules:
-      - alert: InfraStackApiDown
+      # ===== DISPONIBILITÉ =====
+      - alert: APIDown
         expr: up{job="infrastack-api"} == 0
-        for: 0m
+        for: 30s
         labels:
           severity: critical
+          service: api
         annotations:
-          summary: "API FastAPI indisponible"
-          description: "Service {{ $labels.instance }} down."
+          summary: "API InfraStack DOWN"
+          description: "API ne répond plus depuis 30 secondes"
 
-      - alert: InfraStackNginxDown
-        expr: up{job="nginx"} == 0
-        for: 0m
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 30s
         labels:
           severity: critical
+          service: postgres
         annotations:
-          summary: "Nginx indisponible"
-          description: "Service {{ $labels.instance }} down."
+          summary: "PostgreSQL DOWN"
+          description: "Base de données inaccessible"
 
-      - alert: InfraStackHighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis DOWN"
+          description: "Cache Redis inaccessible"
+
+      # ===== PERFORMANCE =====
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "Erreurs 5xx: {{ $value }} req/s"
+          description: "Endpoint {{ $labels.endpoint }} - {{ $labels.method }}"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
         for: 2m
         labels:
           severity: warning
+          service: api
         annotations:
-          summary: "Taux d'erreurs 5xx élevé"
-          description: "Service {{ $labels.instance }} en erreur 5xx."
+          summary: "Latence p95: {{ $value }}s"
+          description: "{{ $labels.endpoint }} est lent"
+
+      # ===== RESSOURCES =====
+      - alert: HighMemory
+        expr: process_resident_memory_bytes / 1024 / 1024 > 200
+        for: 2m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "Mémoire: {{ $value }} MB"
+
+      - alert: TooManyPostgresConnections
+        expr: pg_stat_database_numbackends > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "Connexions PG: {{ $value }}"

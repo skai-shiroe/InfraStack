@@ -1,15 +1,43 @@
 global:
   resolve_timeout: 5m
 
+# Templates pour de beaux messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
 route:
   receiver: "infrastack-default"
-  group_by: ["alertname", "service"]
+  group_by: ["alertname", "severity"]
   group_wait: 10s
-  group_interval: 5m
+  group_interval: 10s
   repeat_interval: 1h
+  
+  # Routes par sévérité
+  routes:
+    - match:
+        severity: critical
+      receiver: "infrastack-critical"
+      group_wait: 5s
+      repeat_interval: 5m
+    
+    - match:
+        severity: warning
+      receiver: "infrastack-warning"
+      repeat_interval: 30m
 
+# Récepteurs
 receivers:
   - name: "infrastack-default"
     webhook_configs:
-      - url: "http://localhost:5001/"
+      - url: "http://api:8000/alerts"
+        send_resolved: true
+
+  - name: "infrastack-critical"
+    webhook_configs:
+      - url: "http://api:8000/alerts"
+        send_resolved: true
+
+  - name: "infrastack-warning"
+    webhook_configs:
+      - url: "http://api:8000/alerts"
         send_resolved: true

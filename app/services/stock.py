@@ -282,9 +282,7 @@ async def create_sale(db: AsyncSession, client_id: int | None, items_data: list[
 async def get_sales(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[Sale]:
     result = await db.execute(
         select(Sale)
-        .options(
-            # relationships loaded automatically by from_attributes
-        )
+        .options(selectinload(Sale.items))  # ← AJOUTEZ CETTE LIGNE
         .offset(skip)
         .limit(limit)
         .order_by(desc(Sale.created_at))
@@ -293,5 +291,7 @@ async def get_sales(db: AsyncSession, skip: int = 0, limit: int = 100) -> list[S
 
 
 async def get_sale(db: AsyncSession, sale_id: int) -> Sale | None:
-    result = await db.execute(select(Sale).where(Sale.id == sale_id))
+    result = await db.execute(select(Sale)
+                        .options(selectinload(Sale.items))  # ← AJOUTEZ CETTE LIGNE
+                        .where(Sale.id == sale_id))
     return result.scalar_one_or_none()
