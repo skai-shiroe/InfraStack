@@ -1,0 +1,108 @@
+# GitLab CI - InfraStack
+stages:
+  - lint
+  - test
+  - build-frontend
+  - build-docker
+  - security
+
+variables:
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE
+  POSTGRES_DB: inventra_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  REDIS_HOST: redis
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/inventra_test
+
+# ============================================
+# Lint Python
+# ============================================
+lint-python:
+  stage: lint
+  image: python:3.12-alpine
+  before_script:
+    - pip install flake8 black isort
+  script:
+    - flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+    - black app/ --check --diff || true
+    - isort app/ --check-only --diff || true
+
+# ============================================
+# Tests avec PostgreSQL + Redis
+# ============================================
+test:
+  stage: test
+  image: python:3.12
+  services:
+    - postgres:17
+    - redis:7-alpine
+  variables:
+    POSTGRES_DB: inventra_test
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/inventra_test
+  before_script:
+    - pip install -r requirements.txt
+    - pip install pytest pytest-asyncio pytest-cov httpx
+  script:
+    - pytest tests/ -v
+      --cov=app
+      --cov-report=xml
+      --cov-report=html
+      --cov-report=term-missing
+      --cov-fail-under=70
+      --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+
+# ============================================
+# Build Frontend React
+# ============================================
+build-frontend:
+  stage: build-frontend
+  image: node:20-alpine
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+
+# ============================================
+# Build & Push Docker Image
+# ============================================
+build-docker:
+  stage: build-docker
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker tag $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA $DOCKER_IMAGE:latest
+    - docker push $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $DOCKER_IMAGE:latest
+  only:
+    - main
+
+# ============================================
+# Security Scan Trivy
+# ============================================
+security-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - trivy image --severity CRITICAL,HIGH --no-progress $DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA
+  only:
+    - main
