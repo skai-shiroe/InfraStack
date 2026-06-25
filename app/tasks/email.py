@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("infrastack.tasks")
 
@@ -22,7 +22,7 @@ async def send_email(ctx, user_id: int, email: str, subject: str) -> dict:
         "user_id": user_id,
         "email": email,
         "subject": subject,
-        "sent_at": datetime.utcnow().isoformat(),
+        "sent_at": datetime.now(timezone.utc).isoformat(),
         "status": "sent",
     }
 

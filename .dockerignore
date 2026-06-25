@@ -15,6 +15,7 @@ Dockerfile
 README.md
 tests/
 backup/
-nginx/
-prometheus/
-grafana/
+
+# Frontend
+frontend/node_modules/
+frontend/.git/

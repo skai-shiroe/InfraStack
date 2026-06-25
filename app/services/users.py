@@ -4,10 +4,15 @@ from sqlalchemy.orm import selectinload
 
 from app.models import User
 from app.schemas import UserCreate, UserUpdate
+from app.core.security import hash_password
 
 
 async def create_user(db: AsyncSession, data: UserCreate) -> User:
-    user = User(email=data.email, name=data.name)
+    user = User(
+        email=data.email,
+        name=data.name,
+        hashed_password=hash_password(data.password),
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
